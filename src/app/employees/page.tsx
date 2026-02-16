@@ -28,6 +28,8 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [addingEmployee, setAddingEmployee] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Form State
   const [newName, setNewName] = useState('');
@@ -38,6 +40,10 @@ export default function EmployeesPage() {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const fetchEmployees = async () => {
     try {
@@ -106,6 +112,9 @@ export default function EmployeesPage() {
     emp.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.skills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const currentEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (loading) {
     return (
@@ -246,7 +255,7 @@ export default function EmployeesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEmployees.map((emp) => {
+              {currentEmployees.map((emp) => {
                 const utilization = getUtilization(emp);
                 const available = emp.max_capacity - emp.allocated_hours;
                 
@@ -310,6 +319,50 @@ export default function EmployeesPage() {
           {filteredEmployees.length === 0 && (
             <div className="py-20 text-center text-muted-foreground italic">
               No talent profiles matching "{searchTerm}" were found in the system.
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-8 py-6 bg-gray-50/50 border-t border-gray-100">
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                Showing <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, filteredEmployees.length)}</span> of <span className="text-gray-900">{filteredEmployees.length}</span> talent profiles
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`h-8 w-8 rounded-lg text-xs font-black transition-all ${
+                        currentPage === page 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                          : "text-gray-400 hover:bg-white hover:text-blue-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

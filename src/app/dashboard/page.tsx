@@ -7,11 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
+import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [tasks, setTasks] = useState<ProcurementTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     fetchData();
@@ -45,6 +48,9 @@ export default function DashboardPage() {
   }));
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+
+  const totalPages = Math.ceil(employees.length / itemsPerPage);
+  const paginatedEmployees = employees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (loading) {
     return (
@@ -141,51 +147,95 @@ export default function DashboardPage() {
       </div>
 
       {/* Employees Table */}
-      <Card className="border-none shadow-2xl overflow-hidden">
+      <Card className="border-none shadow-2xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 p-6">
           <CardTitle>Workforce Capacity</CardTitle>
           <CardDescription>Detailed view of employee roles and current loads</CardDescription>
         </div>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/50">
+            <TableHeader className="bg-muted/30">
               <TableRow>
-                <TableHead className="pl-6">Name</TableHead>
+                <TableHead className="pl-8 py-5">Name</TableHead>
                 <TableHead>Principal Role</TableHead>
                 <TableHead>Expertise</TableHead>
-                <TableHead>Utilization</TableHead>
+                <TableHead className="text-right pr-8">Utilization</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((emp) => (
-                <TableRow key={emp.id} className="hover:bg-muted/30 transition-colors">
-                  <TableCell className="font-semibold pl-6">{emp.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{emp.role}</TableCell>
+              {paginatedEmployees.map((emp) => (
+                <TableRow key={emp.id} className="hover:bg-blue-50/20 transition-all duration-300">
+                  <TableCell className="font-bold text-gray-900 pl-8 py-6">{emp.name}</TableCell>
+                  <TableCell className="text-muted-foreground font-medium">{emp.role}</TableCell>
                   <TableCell>
-                    <div className="flex gap-1 flex-wrap">
+                    <div className="flex gap-1.5 flex-wrap max-w-[200px]">
                       {emp.skills.slice(0, 2).map((skill, idx) => (
-                        <Badge key={idx} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">{skill}</Badge>
+                        <Badge key={idx} variant="secondary" className="bg-white border text-[10px] uppercase font-bold tracking-tight text-gray-500">{skill}</Badge>
                       ))}
-                      {emp.skills.length > 2 && <Badge variant="outline">+{emp.skills.length - 2}</Badge>}
+                      {emp.skills.length > 2 && <Badge variant="outline" className="text-[10px]">+{emp.skills.length - 2}</Badge>}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3 pr-6">
-                      <div className="w-full bg-gray-100 rounded-full h-2.5 max-w-[120px]">
+                  <TableCell className="pr-8">
+                    <div className="flex items-center justify-end gap-4">
+                      <div className="w-24 bg-gray-100 rounded-full h-2 overflow-hidden">
                         <div
-                          className={`h-2.5 rounded-full transition-all duration-1000 ${
+                          className={`h-full rounded-full transition-all duration-1000 ${
                             getUtilization(emp) > 90 ? 'bg-red-500' : getUtilization(emp) > 70 ? 'bg-yellow-500' : 'bg-blue-500'
                           }`}
                           style={{ width: `${Math.min(getUtilization(emp), 100)}%` }}
                         />
                       </div>
-                      <span className="text-sm font-medium tabular-nums w-8">{getUtilization(emp)}%</span>
+                      <span className="text-sm font-black tabular-nums min-w-[32px]">{getUtilization(emp)}%</span>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-8 py-6 bg-gray-50/50 border-t border-gray-100">
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                Page <span className="text-gray-900">{currentPage}</span> of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30 h-8"
+                >
+                  Prev
+                </Button>
+                <div className="flex items-center gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`h-7 w-7 rounded-lg text-[10px] font-black transition-all ${
+                        currentPage === page 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                          : "text-gray-400 hover:bg-white hover:text-blue-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30 h-8"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

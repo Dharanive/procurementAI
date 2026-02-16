@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
-import { Brain, Sparkles, CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Brain, Sparkles, CheckCircle2, AlertCircle, Loader2, ArrowRight, Clock, User as UserIcon, ListTodo } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 // @ts-ignore - Ignore lint error while package resolves in IDE
 import { toast } from 'sonner';
 
@@ -21,6 +22,46 @@ export default function ProcurementPage() {
   const [assignmentResult, setAssignmentResult] = useState<any>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<number>(0);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      // Fetch tasks with their assigned user's name if available
+      const { data, error } = await supabase
+        .from('procurement_tasks')
+        .select(`
+          *,
+          users!procurement_tasks_assigned_to_fkey (
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        // Fallback if the relationship name is different or not easily resolvable
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('procurement_tasks')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (simpleError) throw simpleError;
+        setTasks(simpleData || []);
+      } else {
+        setTasks(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
+
+  const totalPages = Math.ceil(tasks.length / itemsPerPage);
+  const currentTasks = tasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleCreateTask = async () => {
     if (!title || !requiredSkill || !estimatedHours) {
@@ -46,6 +87,7 @@ export default function ProcurementPage() {
 
       setTaskId(data.id);
       toast.success("Task initialized successfully!");
+      fetchTasks();
     } catch (error: any) {
       console.error('Error creating task:', error);
       toast.error(`System Error: ${error.message}`);
@@ -54,12 +96,18 @@ export default function ProcurementPage() {
     }
   };
 
-  const handleAutoAssign = async () => {
-    if (!taskId) return;
+  const handleAutoAssign = async (specificId?: string) => {
+    const idToAssign = specificId || taskId;
+    if (!idToAssign) return;
 
     setLoading(true);
     setAssignmentResult(null);
     setActiveStep(1); // Fetching workforce
+
+    if (specificId) {
+      setTaskId(specificId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
     try {
       // Simulate step progression for better UI feel
@@ -68,7 +116,7 @@ export default function ProcurementPage() {
       const response = await fetch('/api/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
+        body: JSON.stringify({ taskId: idToAssign })
       });
 
       const result = await response.json();
@@ -87,6 +135,7 @@ export default function ProcurementPage() {
         description: `Assigned to ${result.assignedTo}`,
         icon: <Sparkles className="w-4 h-4 text-green-600" />
       });
+      fetchTasks();
     } catch (error: any) {
       console.error('Assignment error:', error);
       setActiveStep(0);
@@ -110,18 +159,22 @@ export default function ProcurementPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 pt-24 max-w-5xl space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-      <div className="flex justify-between items-end">
+    <div className="container mx-auto p-6 pt-24 max-w-[1400px] space-y-16 animate-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="space-y-1">
-          <h1 className="text-4xl font-extrabold tracking-tight">Agentic Procurement</h1>
-          <p className="text-muted-foreground text-lg">Define requirements and let the AI Agents orchestrate the perfect allocation.</p>
+          <h1 className="text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+            Agentic Procurement
+          </h1>
+          <p className="text-muted-foreground text-xl">Define requirements and let the AI Agents orchestrate the perfect allocation.</p>
         </div>
-        <Badge variant="outline" className="px-4 py-1 border-blue-200 text-blue-600 bg-blue-50">
-          <Brain className="w-3 h-3 mr-2" /> Fully Agentic Mode
-        </Badge>
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="px-4 py-2 border-blue-200 text-blue-600 bg-blue-50/50 shadow-sm">
+            <Brain className="w-4 h-4 mr-2" /> Fully Agentic Mode
+          </Badge>
+        </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-12">
+      <div className="grid gap-10 lg:grid-cols-12 max-w-6xl mx-auto w-full">
         {/* Input Form */}
         <div className="lg:col-span-5 space-y-6">
           <Card className="border-none shadow-xl bg-white shadow-blue-500/5">
@@ -202,7 +255,7 @@ export default function ProcurementPage() {
               
               {taskId && !assignmentResult && (
                 <Button 
-                  onClick={handleAutoAssign} 
+                  onClick={() => handleAutoAssign()} 
                   disabled={loading} 
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:opacity-90 shadow-lg shadow-purple-200"
                 >
@@ -332,6 +385,153 @@ export default function ProcurementPage() {
           )}
         </div>
       </div>
+
+      {/* Tasks List Table */}
+      <section className="space-y-6 pt-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20">
+              <ListTodo className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">Recent Procurement Requests</h2>
+              <p className="text-muted-foreground text-lg">Monitor and manage all system-generated tasks and their AI status.</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="h-8 px-4 rounded-full border-gray-200 text-gray-600 bg-gray-50/50 font-bold">
+            Total Tasks: {tasks.length}
+          </Badge>
+        </div>
+
+        <Card className="border-none shadow-2xl overflow-hidden bg-white/70 backdrop-blur-md rounded-[2rem] border border-white/20">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-gray-50/50">
+                <TableRow className="hover:bg-transparent border-gray-100 h-16">
+                  <TableHead className="w-[25%] pl-10 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Requirement</TableHead>
+                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Expertise</TableHead>
+                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Priority</TableHead>
+                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Hours</TableHead>
+                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Assigned To</TableHead>
+                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Status</TableHead>
+                  <TableHead className="text-right pr-10 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentTasks.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground text-lg italic">
+                      No procurement tasks found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentTasks.map((task) => (
+                    <TableRow key={task.id} className="group hover:bg-blue-50/40 transition-all duration-300 border-gray-50 h-24">
+                      <TableCell className="font-bold text-lg pl-10 text-gray-900">{task.title}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-bold bg-white px-3 py-1 border-gray-100 text-gray-600 shadow-sm">
+                          {task.required_skill}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${
+                          task.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' : 
+                          task.priority === 'Medium' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                          'bg-gray-50 text-gray-600 border-gray-100'
+                        } border font-black text-[10px] uppercase tracking-widest px-3 py-1 shadow-sm`}>
+                          {task.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-base font-medium text-gray-500">{task.estimated_hours}h</TableCell>
+                      <TableCell>
+                        {task.users?.name ? (
+                          <div className="flex items-center gap-3">
+                             <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-md">
+                              {task.users.name.charAt(0)}
+                            </div>
+                            <span className="text-sm font-bold text-gray-700">{task.users.name}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-gray-400 italic text-sm">
+                            <Clock className="w-4 h-4" />
+                            <span>Unassigned</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={`${
+                          task.status === 'Completed' ? 'bg-green-100 text-green-700' : 
+                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
+                          'bg-yellow-100 text-yellow-700'
+                        } border-none font-bold px-4 py-1.5 rounded-full text-xs`}>
+                          {task.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-10">
+                        {task.status === 'Pending' && (
+                          <Button 
+                            size="lg" 
+                            variant="outline"
+                            onClick={() => handleAutoAssign(task.id)}
+                            disabled={loading}
+                            className="bg-white hover:bg-blue-600 hover:text-white border-blue-200 text-blue-600 font-black tracking-widest text-[10px] uppercase transition-all shadow-md px-6 rounded-full group-hover:scale-105"
+                          >
+                            <Sparkles className="w-3 h-3 mr-2" /> Auto Assign
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-10 py-6 bg-gray-50/50 border-t border-gray-100">
+              <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                Showing <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, tasks.length)}</span> of <span className="text-gray-900">{tasks.length}</span> requests
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border-gray-200 hover:bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`h-8 w-8 rounded-lg text-xs font-black transition-all ${
+                        currentPage === page 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                          : "text-gray-400 hover:bg-white hover:text-blue-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border-gray-200 hover:bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </section>
     </div>
   );
 }

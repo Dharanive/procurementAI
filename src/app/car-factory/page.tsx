@@ -15,11 +15,16 @@ export default function CarFactoryPage() {
   const [loading, setLoading] = useState(false);
   const [orchestrating, setOrchestrating] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const fetchInventory = async () => {
     setLoading(true);
     const { data } = await supabase.from('inventory').select('*').order('current_stock', { ascending: true });
-    if (data) setInventory(data as InventoryItem[]);
+    if (data) {
+      setInventory(data as InventoryItem[]);
+      setCurrentPage(1); // Reset to first page on refresh
+    }
     setLoading(false);
   };
 
@@ -46,9 +51,12 @@ export default function CarFactoryPage() {
     }
   };
 
+  const totalPages = Math.ceil(inventory.length / itemsPerPage);
+  const currentInventory = inventory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="container mx-auto p-6 pt-24 max-w-7xl space-y-8 animate-in fade-in duration-700">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center text-left">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <div className="bg-blue-600 p-2 rounded-lg text-white">
@@ -97,35 +105,89 @@ export default function CarFactoryPage() {
       <div className="grid gap-8 lg:grid-cols-12">
         {/* Inventory List */}
         <div className="lg:col-span-12">
-           <Card className="border-none shadow-xl bg-white">
-              <CardHeader>
-                <CardTitle>Inventory Hub</CardTitle>
-                <CardDescription>Real-time car part stock levels</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 font-bold text-xs uppercase text-gray-400 mb-4 px-4">
+           <Card className="border-none shadow-2xl overflow-hidden bg-white rounded-[2rem]">
+              <div className="p-8 pb-4">
+                <CardTitle className="text-2xl font-black">Inventory Hub</CardTitle>
+                <CardDescription className="text-lg">Real-time car part stock levels</CardDescription>
+              </div>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 font-black text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-2 px-10 py-4 bg-gray-50/50">
                   <div>Item Name</div>
                   <div>Category</div>
                   <div>Stock Level</div>
                   <div>Threshold</div>
                   <div>Status</div>
                 </div>
-                <div className="space-y-3">
-                  {inventory.map((item) => (
-                    <div key={item.id} className="grid grid-cols-1 md:grid-cols-5 items-center p-4 bg-gray-50/50 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-blue-100">
-                      <div className="font-semibold text-gray-900">{item.item_name}</div>
-                      <div className="text-sm text-gray-500">{item.category}</div>
-                      <div className="font-mono">{item.current_stock} units</div>
-                      <div className="text-sm text-gray-400">Reorder at {item.min_threshold}</div>
-                      <div>
-                        <Badge variant={item.status === 'In Stock' ? 'secondary' : item.status === 'Low Stock' ? 'outline' : 'destructive'} 
-                               className={item.status === 'In Stock' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Low Stock' ? 'border-orange-200 text-orange-600 bg-orange-50' : ''}>
-                          {item.status}
-                        </Badge>
-                      </div>
+                <div className="px-6 pb-6 space-y-2">
+                  {currentInventory.length === 0 ? (
+                    <div className="py-20 text-center text-muted-foreground italic text-lg">
+                      No parts found in the local inventory.
                     </div>
-                  ))}
+                  ) : (
+                    currentInventory.map((item) => (
+                      <div key={item.id} className="grid grid-cols-1 md:grid-cols-5 items-center p-6 bg-white rounded-2xl hover:bg-blue-50/40 transition-all duration-300 border border-transparent hover:border-blue-100 group">
+                        <div className="font-bold text-gray-900 text-lg group-hover:text-blue-700 transition-colors uppercase tracking-tight">{item.item_name}</div>
+                        <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.category}</div>
+                        <div className="font-mono text-base font-black text-gray-900 group-hover:scale-110 transition-transform origin-left">{item.current_stock} units</div>
+                        <div className="text-xs font-bold text-gray-400 uppercase tracking-tight">Reorder at {item.min_threshold}</div>
+                        <div>
+                          <Badge variant={item.status === 'In Stock' ? 'secondary' : item.status === 'Low Stock' ? 'outline' : 'destructive'} 
+                                 className={item.status === 'In Stock' 
+                                   ? 'bg-green-100 text-green-700 border-none px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest' 
+                                   : item.status === 'Low Stock' 
+                                     ? 'bg-orange-100 text-orange-700 border-none px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest' 
+                                     : 'px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest'}>
+                            {item.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
+
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-10 py-6 bg-gray-50/50 border-t border-gray-100">
+                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                      Displaying <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> - <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, inventory.length)}</span> of {inventory.length} components
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1 mx-2">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`h-8 w-8 rounded-lg text-[10px] font-black transition-all ${
+                              currentPage === page 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                                : "text-gray-400 hover:bg-white hover:text-blue-600"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
            </Card>
         </div>
