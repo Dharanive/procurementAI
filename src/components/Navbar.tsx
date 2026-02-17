@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Menu, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { TextRotate } from "@/components/ui/text-rotate";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -43,9 +44,24 @@ export default function Navbar() {
         : "bg-transparent py-6"
     }`}>
       <div className="flex items-center px-4 md:px-6 max-w-7xl mx-auto h-12">
-        <Link href="/" className="font-black text-2xl mr-10 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-80 transition-opacity whitespace-nowrap">
-          ProcureAI
-        </Link>
+        <div className="w-54 flex-shrink-0">
+          <Link href="/" className="flex items-center font-black text-2xl hover:opacity-80 transition-opacity whitespace-nowrap py-1">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+              Procure
+            </span>
+            <TextRotate
+              texts={["AI", "SaaS", "Hub", "Fast", "Agentic"]}
+              rotationInterval={2500}
+              mainClassName="ml-2 px-2 bg-blue-600 text-white rounded-lg overflow-hidden py-0.5 text-xl"
+              staggerDuration={0.03}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "-120%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 400 }}
+              splitLevelClassName="overflow-hidden"
+            />
+          </Link>
+        </div>
         
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-8 text-[11px] font-black uppercase tracking-[0.2em]">

@@ -15,6 +15,69 @@ export interface Notification {
 }
 
 /**
+ * Helper to send email via EmailJS
+ */
+async function sendEmailNotification(
+  type: string,
+  title: string,
+  message: string,
+  priority: string,
+  userId: string | null = null
+) {
+  const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
+  const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
+  const alertTemplateId = process.env.NEXT_PUBLIC_EMAILJS_ALERT_TEMPLATE_ID;
+  const standardTemplateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
+
+  if (!serviceId || !publicKey) {
+    console.warn('[Notification Service] EmailJS not configured');
+    return;
+  }
+
+  // Determine template to use
+  const templateId = (type.includes('Alert') || priority === 'Critical' || priority === 'High')
+    ? alertTemplateId
+    : standardTemplateId;
+
+  if (!templateId) return;
+
+  // Ideally, we fetch the user's email from the DB here
+  // For the demo, we'll send a notification that the email step is ready
+  console.log(`[Notification Service] Triggering EmailJS for ${type}: ${title}`);
+
+  try {
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: serviceId,
+        template_id: templateId,
+        user_id: publicKey,
+        template_params: {
+          to_name: userId ? 'Team Member' : 'Administrator',
+          from_name: 'ProcureAI System',
+          subject: `${priority.toUpperCase()} - ${title}`,
+          title: title,
+          message: message,
+          type: type,
+          priority: priority,
+          timestamp: new Date().toLocaleString()
+        }
+      })
+    });
+
+    if (response.ok) {
+      console.log('[Notification Service] Email sent successfully via EmailJS');
+    } else {
+      const errorText = await response.text();
+      console.error('[Notification Service] EmailJS Error:', errorText);
+    }
+  } catch (error) {
+    console.error('[Notification Service] Failed to send email:', error);
+  }
+}
+
+/**
  * Notification Service
  * Manages all system notifications
  */
@@ -44,6 +107,11 @@ export async function createNotification(
   if (error) {
     console.error('[Notification Service] Failed to create notification:', error);
     throw new Error(`Failed to create notification: ${error.message}`);
+  }
+
+  // Trigger Email for high priority or specific alert types
+  if (priority === 'Critical' || priority === 'High' || type.includes('Alert') || type.includes('Request')) {
+    sendEmailNotification(type, title, message, priority, userId);
   }
 
   return data.id;
