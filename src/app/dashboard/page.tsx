@@ -2,38 +2,58 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, ProcurementTask } from '@/types';
+import { User, ProcurementTask, InventoryPrediction, BudgetInfo, ApprovalRequest } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie, LineChart, Line, Legend } from 'recharts';
 import { Button } from '@/components/ui/button';
+import { AlertTriangle, TrendingDown, DollarSign, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ApprovalDialog } from '@/components/ApprovalDialog';
 
 export default function DashboardPage() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [tasks, setTasks] = useState<ProcurementTask[]>([]);
+  const [predictions, setPredictions] = useState<InventoryPrediction[]>([]);
+  const [budgets, setBudgets] = useState<BudgetInfo[]>([]);
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const itemsPerPage = 5;
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   const fetchData = async () => {
     try {
-      const [employeesRes, tasksRes] = await Promise.all([
+      const [employeesRes, tasksRes, predictionsRes, budgetsRes, approvalsRes] = await Promise.all([
         supabase.from('users').select('*'),
-        supabase.from('procurement_tasks').select('*').order('created_at', { ascending: false })
+        supabase.from('procurement_tasks').select('*').order('created_at', { ascending: false }),
+        fetch('/api/predictions').then(r => r.json()).catch(() => ({ predictions: [] })),
+        fetch('/api/budgets').then(r => r.json()).catch(() => ({ budgets: [] })),
+        fetch('/api/approvals').then(r => r.json()).catch(() => ({ approvals: [] }))
       ]);
 
       if (employeesRes.data) setEmployees(employeesRes.data as User[]);
       if (tasksRes.data) setTasks(tasksRes.data as ProcurementTask[]);
+      if (predictionsRes.predictions) setPredictions(predictionsRes.predictions);
+      if (budgetsRes.budgets) setBudgets(budgetsRes.budgets);
+      if (approvalsRes.approvals) setApprovals(approvalsRes.approvals);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApprovalProcessed = () => {
+    fetchData();
+    setSelectedApproval(null);
   };
 
   const getUtilization = (emp: User) => {
@@ -74,12 +94,15 @@ export default function DashboardPage() {
         {[
           { title: "Total Talent", value: employees.length, sub: "Active Employees" },
           { title: "Active Tasks", value: tasks.length, sub: "Last 30 Days" },
-          { title: "Pending", value: tasks.filter(t => t.status === 'Pending').length, sub: "Awaiting AI Assignment" },
+          { title: "Pending Approvals", value: approvals.length, sub: "Awaiting Review", icon: Clock },
           { title: "Avg. Utilization", value: `${Math.round(chartData.reduce((acc, curr) => acc + curr.utilization, 0) / (employees.length || 1))}%`, sub: "Team Bandwidth" }
         ].map((stat, i) => (
           <Card key={i} className="border-none shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                {stat.icon && <stat.icon className="w-4 h-4" />}
+                {stat.title}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stat.value}</div>
@@ -145,6 +168,248 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* PRIORITY 1 FEATURES SECTION */}
+      
+      {/* 1. Predictive Inventory Cards */}
+      <Card className="border-none shadow-2xl overflow-hidden bg-white">
+        <CardHeader className="bg-gradient-to-r from-orange-600/10 to-red-600/10 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <TrendingDown className="w-6 h-6 text-orange-600" />
+                Predictive Inventory Alerts
+              </CardTitle>
+              <CardDescription>AI-powered predictions of future inventory shortages</CardDescription>
+            </div>
+            <Badge variant="outline" className="bg-white">
+              {predictions.filter(p => p.risk_level === 'Critical' || p.risk_level === 'High').length} High Risk
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          {predictions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No predictions available. Add inventory consumption history to see predictions.
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {predictions.slice(0, 6).map((pred) => {
+                const riskColors = {
+                  Critical: 'bg-red-100 text-red-700 border-red-300',
+                  High: 'bg-orange-100 text-orange-700 border-orange-300',
+                  Medium: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                  Low: 'bg-green-100 text-green-700 border-green-300'
+                };
+                return (
+                  <Card key={pred.inventory_id} className="border-2 hover:shadow-lg transition-all">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{pred.item_name}</CardTitle>
+                        <Badge className={riskColors[pred.risk_level]}>
+                          {pred.risk_level}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Current Stock:</span>
+                        <span className="font-bold">{pred.current_stock} units</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Days Until Depletion:</span>
+                        <span className="font-bold text-orange-600">{pred.days_until_depletion} days</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Daily Consumption:</span>
+                        <span className="font-bold">{pred.average_daily_consumption.toFixed(2)}/day</span>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-muted-foreground italic">{pred.recommended_action}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2. Budget Analysis */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-none shadow-2xl overflow-hidden bg-white">
+          <CardHeader className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border-b border-gray-100">
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <DollarSign className="w-6 h-6 text-blue-600" />
+              Budget Utilization
+            </CardTitle>
+            <CardDescription>Real-time spending vs. budget caps</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 h-[350px]">
+            {budgets.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No budgets configured
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={budgets}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis type="number" hide domain={[0, 100]} />
+                  <YAxis 
+                    dataKey="category" 
+                    type="category" 
+                    width={100} 
+                    fontSize={12}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    cursor={{fill: 'rgba(0,0,0,0.05)'}}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                    formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Utilization']}
+                  />
+                  <Bar dataKey="utilization_percentage" radius={[0, 4, 4, 0]} barSize={20}>
+                    {budgets.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.utilization_percentage > 100 ? '#ef4444' : entry.utilization_percentage > 80 ? '#f59e0b' : '#3b82f6'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-2xl overflow-hidden bg-white">
+          <CardHeader className="bg-gradient-to-r from-purple-600/10 to-pink-600/10 border-b border-gray-100">
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <DollarSign className="w-6 h-6 text-purple-600" />
+              Budget Distribution
+            </CardTitle>
+            <CardDescription>Financial breakdown across departments</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 h-[350px]">
+            {budgets.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No budget data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={budgets}
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="current_spend"
+                    nameKey="category"
+                  >
+                    {budgets.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                    formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Spent']}
+                  />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Approval Queue Table */}
+      <Card className="border-none shadow-2xl overflow-hidden bg-white">
+        <CardHeader className="bg-gradient-to-r from-green-600/10 to-emerald-600/10 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                Approval Queue
+              </CardTitle>
+              <CardDescription>Pending approval requests requiring your review</CardDescription>
+            </div>
+            <Badge variant="outline" className="bg-white">
+              {approvals.length} Pending
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {approvals.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-green-500 opacity-50" />
+              <p className="text-lg">No pending approvals</p>
+              <p className="text-sm">All approval requests have been processed</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-gray-50/30">
+                <TableRow>
+                  <TableHead className="pl-8 py-5">Request Type</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Current Level</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right pr-8">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {approvals.map((approval) => (
+                  <TableRow key={approval.id} className="hover:bg-blue-50/20 transition-all duration-300">
+                    <TableCell className="pl-8 py-6">
+                      <div className="font-bold text-gray-900">{approval.request_type}</div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-blue-600">${approval.amount.toLocaleString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-blue-100 text-blue-700">
+                        Level {approval.current_approver_level} of {approval.max_approval_level}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(approval.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedApproval(approval);
+                          setApprovalDialogOpen(true);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Review
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Approval Dialog */}
+      <ApprovalDialog
+        approval={selectedApproval}
+        open={approvalDialogOpen}
+        onOpenChange={setApprovalDialogOpen}
+        onApproved={handleApprovalProcessed}
+      />
+
+
 
       {/* Employees Table */}
       <Card className="border-none shadow-2xl overflow-hidden bg-white">
