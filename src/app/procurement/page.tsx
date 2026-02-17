@@ -160,7 +160,7 @@ export default function ProcurementPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 pt-24 max-w-[1400px] space-y-16 animate-in slide-in-from-bottom-4 duration-700">
+    <div className="container mx-auto p-6 pt-24 space-y-16 animate-in slide-in-from-bottom-4 duration-700">
       {/* Hero Section with 3D Spline */}
       <div className="mb-12">
         <SplineSceneBasic />
@@ -388,110 +388,108 @@ export default function ProcurementPage() {
       </div>
 
       {/* Tasks List Table */}
-      <section className="space-y-6 pt-12">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20">
-              <ListTodo className="w-6 h-6" />
-            </div>
+      <Card className="border-none shadow-2xl overflow-hidden bg-white">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-100 py-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">Recent Procurement Requests</h2>
-              <p className="text-muted-foreground text-lg">Monitor and manage all system-generated tasks and their AI status.</p>
+              <CardTitle className="text-2xl">Recent Procurement Requests</CardTitle>
+              <CardDescription>Monitor and manage all system-generated tasks and their AI status.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-white">Total: {tasks.length}</Badge>
             </div>
           </div>
-          <Badge variant="outline" className="h-8 px-4 rounded-full border-gray-200 text-gray-600 bg-gray-50/50 font-bold">
-            Total Tasks: {tasks.length}
-          </Badge>
-        </div>
-
-        <Card className="border-none shadow-2xl overflow-hidden bg-white/70 backdrop-blur-md rounded-[2rem] border border-white/20">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-gray-50/50">
-                <TableRow className="hover:bg-transparent border-gray-100 h-16">
-                  <TableHead className="w-[25%] pl-10 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Requirement</TableHead>
-                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Expertise</TableHead>
-                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Priority</TableHead>
-                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Hours</TableHead>
-                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Assigned To</TableHead>
-                  <TableHead className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Status</TableHead>
-                  <TableHead className="text-right pr-10 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Action</TableHead>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-gray-50/30">
+              <TableRow>
+                <TableHead className="pl-8 py-5">Requirement</TableHead>
+                <TableHead>Expertise</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Hours</TableHead>
+                <TableHead>Assigned To</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right pr-8">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currentTasks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-20 text-center text-muted-foreground italic">
+                    No procurement tasks found.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentTasks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground text-lg italic">
-                      No procurement tasks found.
+              ) : (
+                currentTasks.map((task) => (
+                  <TableRow key={task.id} className="hover:bg-blue-50/20 transition-all duration-300 group">
+                    <TableCell className="pl-8 py-6">
+                      <div className="font-bold text-gray-900">{task.title}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-white border text-[10px] uppercase font-bold tracking-tight text-gray-500 group-hover:border-blue-200 group-hover:text-blue-600 transition-colors">
+                        {task.required_skill}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`border-none ${
+                        task.priority === 'High' ? 'bg-red-100 text-red-700' : 
+                        task.priority === 'Medium' ? 'bg-blue-100 text-blue-700' : 
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {task.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-base font-medium text-gray-500">
+                      {task.estimated_hours}h
+                    </TableCell>
+                    <TableCell>
+                      {task.users?.name ? (
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center font-bold text-gray-500 group-hover:from-blue-600 group-hover:to-purple-600 group-hover:text-white transition-all duration-500">
+                            {task.users.name.charAt(0)}
+                          </div>
+                          <span className="font-bold text-gray-900">{task.users.name}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground italic text-sm">
+                          <Clock className="w-4 h-4" />
+                          <span>Unassigned</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`border-none ${
+                        task.status === 'Completed' ? 'bg-green-100 text-green-700' : 
+                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {task.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      {task.status === 'Pending' && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleAutoAssign(task.id)}
+                          disabled={loading}
+                          className="bg-white hover:bg-blue-600 hover:text-white border-gray-200 text-gray-600 font-bold transition-all shadow-md rounded-xl"
+                        >
+                          <Sparkles className="w-3 h-3 mr-2" /> Auto Assign
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  currentTasks.map((task) => (
-                    <TableRow key={task.id} className="group hover:bg-blue-50/40 transition-all duration-300 border-gray-50 h-24">
-                      <TableCell className="font-bold text-lg pl-10 text-gray-900">{task.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-bold bg-white px-3 py-1 border-gray-100 text-gray-600 shadow-sm">
-                          {task.required_skill}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${
-                          task.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' : 
-                          task.priority === 'Medium' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                          'bg-gray-50 text-gray-600 border-gray-100'
-                        } border font-black text-[10px] uppercase tracking-widest px-3 py-1 shadow-sm`}>
-                          {task.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-base font-medium text-gray-500">{task.estimated_hours}h</TableCell>
-                      <TableCell>
-                        {task.users?.name ? (
-                          <div className="flex items-center gap-3">
-                             <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-md">
-                              {task.users.name.charAt(0)}
-                            </div>
-                            <span className="text-sm font-bold text-gray-700">{task.users.name}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-gray-400 italic text-sm">
-                            <Clock className="w-4 h-4" />
-                            <span>Unassigned</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={`${
-                          task.status === 'Completed' ? 'bg-green-100 text-green-700' : 
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
-                          'bg-yellow-100 text-yellow-700'
-                        } border-none font-bold px-4 py-1.5 rounded-full text-xs`}>
-                          {task.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right pr-10">
-                        {task.status === 'Pending' && (
-                          <Button 
-                            size="lg" 
-                            variant="outline"
-                            onClick={() => handleAutoAssign(task.id)}
-                            disabled={loading}
-                            className="bg-white hover:bg-blue-600 hover:text-white border-blue-200 text-blue-600 font-black tracking-widest text-[10px] uppercase transition-all shadow-md px-6 rounded-full group-hover:scale-105"
-                          >
-                            <Sparkles className="w-3 h-3 mr-2" /> Auto Assign
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
+                ))
+              )}
+            </TableBody>
+          </Table>
           
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-10 py-6 bg-gray-50/50 border-t border-gray-100">
-              <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+            <div className="flex items-center justify-between px-8 py-6 bg-gray-50/50 border-t border-gray-100">
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                 Showing <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, tasks.length)}</span> of <span className="text-gray-900">{tasks.length}</span> requests
               </div>
               <div className="flex items-center gap-2">
@@ -500,7 +498,7 @@ export default function ProcurementPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="rounded-xl border-gray-200 hover:bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
                 >
                   Previous
                 </Button>
@@ -524,15 +522,15 @@ export default function ProcurementPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="rounded-xl border-gray-200 hover:bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
                 >
                   Next
                 </Button>
               </div>
             </div>
           )}
-        </Card>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   );
 }

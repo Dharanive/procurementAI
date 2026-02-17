@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { Car, Package, Truck, Users, Activity, Loader2, CheckCircle2, AlertTriangle, Sparkles, Brain } from 'lucide-react';
+import { Car, Package, Truck, Users, Activity, Loader2, CheckCircle2, AlertTriangle, Sparkles, Brain, Plus } from 'lucide-react';
 // @ts-ignore
 import { toast } from 'sonner';
 import { InventoryItem, Vendor } from '@/types';
@@ -17,6 +22,17 @@ export default function CarFactoryPage() {
   const [lastResult, setLastResult] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  
+  // Add Inventory Dialog State
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    item_name: '',
+    category: '',
+    current_stock: '',
+    min_threshold: '',
+    unit_price: ''
+  });
 
   const fetchInventory = async () => {
     setLoading(true);
@@ -51,11 +67,76 @@ export default function CarFactoryPage() {
     }
   };
 
+  const handleAddInventory = async () => {
+    // Validation
+    if (!formData.item_name || !formData.category || !formData.current_stock || !formData.min_threshold || !formData.unit_price) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
+
+    const currentStock = parseInt(formData.current_stock);
+    const minThreshold = parseInt(formData.min_threshold);
+    const unitPrice = parseFloat(formData.unit_price);
+
+    if (isNaN(currentStock) || currentStock < 0) {
+      toast.error("Current stock must be a valid number.");
+      return;
+    }
+
+    if (isNaN(minThreshold) || minThreshold < 0) {
+      toast.error("Minimum threshold must be a valid number.");
+      return;
+    }
+
+    if (isNaN(unitPrice) || unitPrice < 0) {
+      toast.error("Unit price must be a valid number.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .insert({
+          item_name: formData.item_name,
+          category: formData.category,
+          current_stock: currentStock,
+          min_threshold: minThreshold,
+          unit_price: unitPrice
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Inventory item added successfully!", {
+        description: `${formData.item_name} has been added to inventory.`
+      });
+
+      // Reset form
+      setFormData({
+        item_name: '',
+        category: '',
+        current_stock: '',
+        min_threshold: '',
+        unit_price: ''
+      });
+
+      setDialogOpen(false);
+      fetchInventory(); // Refresh inventory list
+    } catch (error: any) {
+      console.error('Error adding inventory:', error);
+      toast.error(`Failed to add inventory: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const totalPages = Math.ceil(inventory.length / itemsPerPage);
   const currentInventory = inventory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="container mx-auto p-6 pt-24 max-w-7xl space-y-8 animate-in fade-in duration-700">
+    <div className="container mx-auto p-6 pt-24 space-y-8 animate-in fade-in duration-700">
       <div className="flex justify-between items-center text-left">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -67,18 +148,141 @@ export default function CarFactoryPage() {
           <p className="text-muted-foreground text-lg">Autonomous Inventory & Workforce Orchestration</p>
         </div>
         
-        <Button 
-          size="lg" 
-          onClick={runAutonomousWorkflow} 
-          disabled={orchestrating}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 shadow-xl shadow-blue-200"
-        >
-          {orchestrating ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Agents Thinking...</>
-          ) : (
-            <><Brain className="w-4 h-4 mr-2" /> Trigger Autonomous Review</>
-          )}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90 shadow-xl shadow-green-200"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Inventory
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">Add New Inventory Item</DialogTitle>
+                <DialogDescription>
+                  Add a new car part or component to the inventory system.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="item_name">Item Name *</Label>
+                  <Input
+                    id="item_name"
+                    placeholder="e.g., V8 Engine Block"
+                    value={formData.item_name}
+                    onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                    disabled={saving}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="category">Category *</Label>
+                  <Select 
+                    value={formData.category} 
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    disabled={saving}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Engine">Engine</SelectItem>
+                      <SelectItem value="Wheels">Wheels</SelectItem>
+                      <SelectItem value="Safety">Safety</SelectItem>
+                      <SelectItem value="Electronics">Electronics</SelectItem>
+                      <SelectItem value="Interior">Interior</SelectItem>
+                      <SelectItem value="Exterior">Exterior</SelectItem>
+                      <SelectItem value="Transmission">Transmission</SelectItem>
+                      <SelectItem value="Brakes">Brakes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="current_stock">Current Stock *</Label>
+                    <Input
+                      id="current_stock"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={formData.current_stock}
+                      onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="min_threshold">Min Threshold *</Label>
+                    <Input
+                      id="min_threshold"
+                      type="number"
+                      min="0"
+                      placeholder="5"
+                      value={formData.min_threshold}
+                      onChange={(e) => setFormData({ ...formData, min_threshold: e.target.value })}
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="unit_price">Unit Price ($) *</Label>
+                  <Input
+                    id="unit_price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.unit_price}
+                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDialogOpen(false);
+                    setFormData({
+                      item_name: '',
+                      category: '',
+                      current_stock: '',
+                      min_threshold: '',
+                      unit_price: ''
+                    });
+                  }}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddInventory}
+                  disabled={saving}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90"
+                >
+                  {saving ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4 mr-2" /> Add to Inventory</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Button 
+            size="lg" 
+            onClick={runAutonomousWorkflow} 
+            disabled={orchestrating}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 shadow-xl shadow-blue-200"
+          >
+            {orchestrating ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Agents Thinking...</>
+            ) : (
+              <><Brain className="w-4 h-4 mr-2" /> Trigger Autonomous Review</>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -102,99 +306,126 @@ export default function CarFactoryPage() {
         </Card>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-12">
-        {/* Inventory List */}
-        <div className="lg:col-span-12">
-           <Card className="border-none shadow-2xl overflow-hidden bg-white rounded-[2rem]">
-              <div className="p-8 pb-4">
-                <CardTitle className="text-2xl font-black">Inventory Hub</CardTitle>
-                <CardDescription className="text-lg">Real-time car part stock levels</CardDescription>
+      {/* Inventory List */}
+      <Card className="border-none shadow-2xl overflow-hidden bg-white">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-100 py-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl">Inventory Hub</CardTitle>
+              <CardDescription>Real-time car part stock levels</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-white">Total: {inventory.length}</Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-gray-50/30">
+              <TableRow>
+                <TableHead className="pl-8 py-5">Item Name</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Stock Level</TableHead>
+                <TableHead>Threshold</TableHead>
+                <TableHead className="text-right pr-8">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currentInventory.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-20 text-center text-muted-foreground italic">
+                    No parts found in the local inventory.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentInventory.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-blue-50/20 transition-all duration-300 group">
+                    <TableCell className="pl-8 py-6">
+                      <div className="font-bold text-gray-900">{item.item_name}</div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-medium">
+                      {item.category}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-mono text-base font-black text-gray-900">
+                        {item.current_stock} units
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-muted-foreground">
+                        Reorder at {item.min_threshold}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      <Badge 
+                        className={`border-none ${
+                          item.status === 'In Stock' 
+                            ? 'bg-green-100 text-green-700' 
+                            : item.status === 'Low Stock' 
+                              ? 'bg-amber-100 text-amber-700' 
+                              : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-8 py-6 bg-gray-50/50 border-t border-gray-100">
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                Showing <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, inventory.length)}</span> of <span className="text-gray-900">{inventory.length}</span> components
               </div>
-              <CardContent className="p-0">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 font-black text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-2 px-10 py-4 bg-gray-50/50">
-                  <div>Item Name</div>
-                  <div>Category</div>
-                  <div>Stock Level</div>
-                  <div>Threshold</div>
-                  <div>Status</div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`h-8 w-8 rounded-lg text-xs font-black transition-all ${
+                        currentPage === page 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                          : "text-gray-400 hover:bg-white hover:text-blue-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                 </div>
-                <div className="px-6 pb-6 space-y-2">
-                  {currentInventory.length === 0 ? (
-                    <div className="py-20 text-center text-muted-foreground italic text-lg">
-                      No parts found in the local inventory.
-                    </div>
-                  ) : (
-                    currentInventory.map((item) => (
-                      <div key={item.id} className="grid grid-cols-1 md:grid-cols-5 items-center p-6 bg-white rounded-2xl hover:bg-blue-50/40 transition-all duration-300 border border-transparent hover:border-blue-100 group">
-                        <div className="font-bold text-gray-900 text-lg group-hover:text-blue-700 transition-colors uppercase tracking-tight">{item.item_name}</div>
-                        <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.category}</div>
-                        <div className="font-mono text-base font-black text-gray-900 group-hover:scale-110 transition-transform origin-left">{item.current_stock} units</div>
-                        <div className="text-xs font-bold text-gray-400 uppercase tracking-tight">Reorder at {item.min_threshold}</div>
-                        <div>
-                          <Badge variant={item.status === 'In Stock' ? 'secondary' : item.status === 'Low Stock' ? 'outline' : 'destructive'} 
-                                 className={item.status === 'In Stock' 
-                                   ? 'bg-green-100 text-green-700 border-none px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest' 
-                                   : item.status === 'Low Stock' 
-                                     ? 'bg-orange-100 text-orange-700 border-none px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest' 
-                                     : 'px-4 py-1 rounded-full font-bold text-[10px] uppercase tracking-widest'}>
-                            {item.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-10 py-6 bg-gray-50/50 border-t border-gray-100">
-                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                      Displaying <span className="text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> - <span className="text-gray-900">{Math.min(currentPage * itemsPerPage, inventory.length)}</span> of {inventory.length} components
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
-                      >
-                        Previous
-                      </Button>
-                      <div className="flex items-center gap-1 mx-2">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <button
-                            key={page}
-                            onClick={() => setCurrentPage(page)}
-                            className={`h-8 w-8 rounded-lg text-[10px] font-black transition-all ${
-                              currentPage === page 
-                                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
-                                : "text-gray-400 hover:bg-white hover:text-blue-600"
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ))}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="rounded-xl border-gray-200 bg-white hover:text-blue-600 font-bold transition-all disabled:opacity-30"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-           </Card>
-        </div>
+      <div className="grid gap-8 lg:grid-cols-12">
 
         {/* Workflow Results */}
         {lastResult && (
-          <div className="lg:col-span-12 space-y-6 animate-in slide-in-from-bottom-8">
+          <div className="space-y-6 animate-in slide-in-from-bottom-8">
              <h2 className="text-2xl font-bold flex items-center gap-2"><Sparkles className="w-6 h-6 text-blue-600" /> Autonomous Agent Log</h2>
              
              <div className="grid gap-6 md:grid-cols-2">
