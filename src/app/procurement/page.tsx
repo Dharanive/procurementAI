@@ -12,6 +12,7 @@ import { Brain, Sparkles, CheckCircle2, AlertCircle, Loader2, ArrowRight, Clock,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 // @ts-ignore - Ignore lint error while package resolves in IDE
 import { toast } from 'sonner';
+import { SplineSceneBasic } from '@/components/ui/spline-demo';
 
 export default function ProcurementPage() {
   const [title, setTitle] = useState('');
@@ -160,13 +161,13 @@ export default function ProcurementPage() {
 
   return (
     <div className="container mx-auto p-6 pt-24 max-w-[1400px] space-y-16 animate-in slide-in-from-bottom-4 duration-700">
+      {/* Hero Section with 3D Spline */}
+      <div className="mb-12">
+        <SplineSceneBasic />
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="space-y-1">
-          <h1 className="text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
-            Agentic Procurement
-          </h1>
-          <p className="text-muted-foreground text-xl">Define requirements and let the AI Agents orchestrate the perfect allocation.</p>
-        </div>
+       
         <div className="flex items-center gap-4">
           <Badge variant="outline" className="px-4 py-2 border-blue-200 text-blue-600 bg-blue-50/50 shadow-sm">
             <Brain className="w-4 h-4 mr-2" /> Fully Agentic Mode
